@@ -11,8 +11,22 @@ A lightweight, modular Python-based vulnerability scanner designed for education
     - Online CVE API
 - JSON report generation
 - Simple installer: `python3 setup.py`
+- **NEW** Added GUI with debug window for ease of use
 
+## Dependencies
+- "Python 3.9+"
+- "requests (This is installed during setup automatically)
+- "tkinter - not included in all Linux installs, i.e. Arch. If missing, install via package manager.
+```bash
+sudo pacman -S tk 
+
+or
+
+sudo apt install python3-tk
+```
 ## Getting Started
+
+Instructions for terminal setup for headless setups.
 
 ```bash
 git clone https://github.com/RamShackl/VulnScanner.git
