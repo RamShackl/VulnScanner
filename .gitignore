@@ -1,0 +1,19 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Environment
+venv/
+.env
+
+# NVD Data (large, generated locally)
+nvdcve-*.json
+*.zip
+
+# Output reports
+report.json
+*.html
+
+# OS/filesystem
+.DS_Store
+Thumbs.db
