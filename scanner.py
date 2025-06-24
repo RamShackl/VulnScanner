@@ -17,10 +17,12 @@ def generateTargets(ip_or_cidr):
 
 
 
-def scanTarget(target):
+def scanTarget(target, verbose=False):
     report = {"target": target, "openPorts":{}}
     
     for port in COMMONPORTS:
+        if verbose:
+            print(f"[*] Checking port {port}...")
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(1)
@@ -28,6 +30,8 @@ def scanTarget(target):
 
                 if result == 0:
                     banner = bannerGrab(target, port)
+                    if verbose:
+                        print(f"[+] Port {port} open: Banner: {banner.strip()}")
                     vulnInfo = None
                     matched_cves = []
                     for word in banner.lower().split():
@@ -46,11 +50,13 @@ def scanTarget(target):
                         ]
                     }
         except Exception as e:
+            if verbose:
+                print(f"[!] Error on port {port}: {e}")
             continue 
     return report
 
 
-def scanTargets(target_list):
+def scanTargets(target_list, verbose=False):
     results = []
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = {executor.submit(scanTarget, target): target for target in target_list}
