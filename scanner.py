@@ -70,7 +70,7 @@ def scanTarget(target, verbose=False, port_list=None):
                 result = s.connect_ex((target, port))
 
                 if result == 0:
-                    banner = bannerGrab(target, port)
+                    banner = grabBanner(target, port)
                     if verbose:
                         print(f"[+] Port {port} open: Banner: {banner.strip()}")
                     vulnInfo = None
