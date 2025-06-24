@@ -19,7 +19,7 @@ git clone https://github.com/RamShackl/VulnScanner.git
 cd VulnerabilityScanner
 python3 setup.py
 python3 main.py <target> -o report.json
-
+```
 
 ## Disclaimer
 **For educational use only. Do not use without permission**
