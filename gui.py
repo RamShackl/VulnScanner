@@ -42,6 +42,10 @@ class VulnScannerGUI:
         self.ensure_nvd_data()
         self.log("[#] Setup complete. Ready to scan.")
 
+    def print_to_log(self, *args, **kwargs):
+        message = " ".join(str(arg) for arg in args)
+        self.log(message)
+
     def ensure_nvd_data(self):
         if not os.path.exists("nvdcve-1.1-2024.json"):
             self.log("[!] NVD database not found. Running setup.py...")
@@ -69,11 +73,13 @@ class VulnScannerGUI:
         self.log(f"[~] Starting scan for: {target}")
         targets = generateTargets(target)
 
-        stdout_buffer = io.StringIO()
-        with redirect_stdout(stdout_buffer):
+        original_print = __builtins__.print
+        __builtins__.print = self.print_to_log
+
+        try:
             results = scanTargets(targets, verbose=verbose, port_list=port_list)
-        
-        self.log(stdout_buffer.getvalue())
+        finally:
+            __builtins__.print = original_print
 
         with open("report.json", "w") as f:
             json.dump(results, f, indent=2)

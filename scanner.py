@@ -40,15 +40,23 @@ COMMONPORTS = [
     1723, 5900, 6000, 6667
 ]
 
-
-def generateTargets(ip_or_cidr):
+# Accepts inputs for scanning
+def generateTargets(target_input):
+    targets = []
     try:
-        network = ipaddress.ip_network(ip_or_cidr, strict=False)
+        # Check for IP range / CIDR
+        network = ipaddress.ip_network(target_input, strict=False)
         return [str(ip) for ip in network.hosts()]
     except ValueError:
-        return [ip_or_cidr]
+        # Not a CIDR - maybe a single IP or domain
+        try:
+            resolved_ip = socket.gethostbyname(target_input)
+            targets = [resolved_ip]
+        except socket.gaierror:
+            print(f"[!] Could not resolve domain: {target_input}")
+            return []
 
-
+    return targets
 
 
 def scanTarget(target, verbose=False, port_list=None):
@@ -81,15 +89,25 @@ def scanTarget(target, verbose=False, port_list=None):
 
 
                     cveResults = searchCVE(banner.strip())
+
+                    if not matched_cves and not cveResults:
+                        if verbose:
+                            print(f"[#] Port {port} - No known vulnerabilities found.")
+
+                    hasVulns = bool(vulnInfo) or bool(cveResults) or bool(matched_cves)
+
                     report["openPorts"][port] = {
                         "banner": banner.strip(),
                         "vulnerable": bool(cveResults or matched_cves),
-                        "notes": f"Local DB matches: {len(matched_cves)}" if matched_cves else "None",
-                        "CVE_results": [
+                        "notes": vulnInfo or "None",
+                        "vulnerabilities_found": (
+                            [
                             {"id": cve.get("id"), "summary": cve.get("summary")}
                             for cve in cveResults
-                        ]
-                    }
+                        ] if hasVulns else
+                        "No known vulnerabilities found."
+                    )
+                }
         except Exception as e:
             if verbose:
                 print(f"[!] Error on port {port}: {e}")
