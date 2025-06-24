@@ -31,6 +31,10 @@ class VulnScannerGUI:
         self.view_button = ttk.Button(root, text="View Report", command=self.view_report)
         self.view_button.pack(pady=5)
 
+        self.full_scan_var = tk.BooleanVar()
+        self.full_scan_check = ttk.Checkbutton(root, text="Scan all well-known ports", variable=self.full_scan_var)
+        self.full_scan_check.pack()
+
         self.output_box = ScrolledText(root, height=25, bg="black", fg="lime", font=("Courier", 10))
         self.output_box.pack(fill=tk.BOTH, expand=True)
 
@@ -55,6 +59,8 @@ class VulnScannerGUI:
     def run_scan(self):
         target = self.target_entry.get()
         verbose = self.verbose_var.get()
+        port_list = list(range(1, 1025)) if self.full_scan_var.get() else None
+
 
         if not target:
             messagebox.showwarning("Missing Target", "Please enter a valid IP or CIDR.")
@@ -65,7 +71,7 @@ class VulnScannerGUI:
 
         stdout_buffer = io.StringIO()
         with redirect_stdout(stdout_buffer):
-            results = scanTargets(targets)
+            results = scanTargets(targets, verbose=verbose, port_list=port_list)
         
         self.log(stdout_buffer.getvalue())
 

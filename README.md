@@ -35,5 +35,11 @@ python3 setup.py
 python3 main.py <target> -o report.json
 ```
 
+arguments:
+
+-v or --verbose for verbose
+-f or --full-scan for a scan of ports 1-1024
+-o or --output for a designated output file. report.json is default
+
 ## Disclaimer
 **For educational use only. Do not use without permission**
