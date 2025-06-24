@@ -34,14 +34,18 @@ class VulnScannerGUI:
         self.output_box = ScrolledText(root, height=25, bg="black", fg="lime", font=("Courier", 10))
         self.output_box.pack(fill=tk.BOTH, expand=True)
 
+        self.log("[~] Initializing Vulnerability Scanner...")
         self.ensure_nvd_data()
+        self.log("[#] Setup complete. Ready to scan.")
 
     def ensure_nvd_data(self):
         if not os.path.exists("nvdcve-1.1-2024.json"):
             self.log("[!] NVD database not found. Running setup.py...")
             try:
                 subprocess.run(["python3,", "setup.py"], check=True)
+                self.log("[#] NVD data successfully downloaded.")
             except Exception as e:
+                self.log(f"[X] Setup failed: {e}")
                 messagebox.showerror("Setup Failed", str(e))
     
     def start_scan_thread(self):
@@ -118,7 +122,7 @@ class VulnScannerGUI:
         report_text.tag_config("header", foreground="blue", font=("Courier", 11, "bold"))
 
         report_text.config(state=tk.DISABLED)
-        
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = VulnScannerGUI(root)

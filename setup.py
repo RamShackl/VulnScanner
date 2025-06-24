@@ -1,6 +1,12 @@
 import subprocess
 import sys
 import os
+import shutil
+
+if not shutil.which("pip"):
+    print("[!] pip is not installed or not found in PATH.")
+    print(" Please install pip manually before running this program")
+    sys.exit(1)
 
 def installRequirements():
     print("[*] Installing Python requirements...")
