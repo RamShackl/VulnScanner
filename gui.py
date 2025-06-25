@@ -3,12 +3,17 @@ import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 from tkinter.scrolledtext import ScrolledText
-from contextlib import redirect_stdout
-import io
 import subprocess
 import json
+import signal
+import sys
 
 from scanner import generateTargets, scanTargets, scanTarget
+
+def signal_handler(sig, frame):
+    print("Exiting, closing GUI windows...")
+    root.destroy()  # root is your Tkinter main window
+    sys.exit(0)
 
 class VulnScannerGUI:
     def __init__(self, root):
@@ -50,13 +55,14 @@ class VulnScannerGUI:
         if not os.path.exists("nvdcve-1.1-2024.json"):
             self.log("[!] NVD database not found. Running setup.py...")
             try:
-                subprocess.run(["python3,", "setup.py"], check=True)
+                subprocess.run(["python3", "setup.py"], check=True)
                 self.log("[#] NVD data successfully downloaded.")
             except Exception as e:
                 self.log(f"[X] Setup failed: {e}")
                 messagebox.showerror("Setup Failed", str(e))
     
     def start_scan_thread(self):
+        self.start_button.config(state=tk.DISABLED)
         thread = threading.Thread(target=self.run_scan)
         thread.start()
     
@@ -85,6 +91,7 @@ class VulnScannerGUI:
             json.dump(results, f, indent=2)
 
         self.log("[#] Scan complete. Report saved to report.json")
+        self.start_button.config(state=tk.NORMAL)
 
     def log(self, message):
         self.output_box.insert(tk.END, message + "\n")
@@ -121,7 +128,7 @@ class VulnScannerGUI:
 
                 if vuln:
                     report_text.insert(tk.END, "Vulnerabilities:\n", "vuln")
-                    for cve in info.get("CVE_results", []):
+                    for cve in info.get("vulnerabilities_found", []):
                         report_text.insert(
                             tk.END,
                             f" -{cve.get('id')}: {cve.get('summary')}\n",
@@ -136,6 +143,8 @@ class VulnScannerGUI:
         report_text.config(state=tk.DISABLED)
 
 if __name__ == "__main__":
+    global root
     root = tk.Tk()
+    signal.signal(signal.SIGINT, signal_handler)
     app = VulnScannerGUI(root)
     root.mainloop()

@@ -3,6 +3,26 @@ import ssl
 import http.client
 import requests
 
+def httpProbe(target, port, verbose=False):
+    try:
+        url = f"http://{target}:{port}/"
+        if port == 443:
+            url = f"https://{target}/"
+
+        if verbose:
+            print(f"[*] Probing HTTP(s) URL: {url}")
+
+        response = requests.get(url, timeout=3)
+        server = response.headers.get("Server", "Unknown Server")
+        status_line = f"HTTP/{response.raw.version/10:.1f} {response.status_code} {response.reason}"
+        body_snippet = response.text[:200].replace('\n', ' ').replace('\r', '')
+
+        banner = f"{status_line}\nServer: {server}\nBody Snippet: {body_snippet}"
+        return banner
+
+    except requests.exceptions.RequestException as e:
+        return f"HTTP request failed: {e}"
+    
 def smbProbe(target, port):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -20,7 +40,7 @@ def smbProbe(target, port):
             return "Possible SMB response (unparsed)"
     except Exception as e:
         return f"SMB probe failed: {e}"
-    
+
 def sshProbe(target, port):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -59,31 +79,21 @@ def dnsProbe(target, port=53):
     except Exception as e:
         return f"DNS probe failed: {e}"
 
-
-def httpProbe(target, port, verbose=False):
-    try:
-        url = f"http://{target}:{port}/"
-        if port == 443:
-            url = f"https://{target}/"
-
-        if verbose:
-            print(f"[*] Probing HTTP(s) URL: {url}")
-
-        response = requests.get(url, timeout=3)
-        server = response.headers.get("Server", "Unknown Server")
-        status_line = f"HTTP/{response.raw.version/10:.1f} {response.status_code} {response.reason}"
-        body_snippet = response.text[:200].replace('\n', ' ').replace('\r', '')
-
-        banner = f"{status_line}\nServer: {server}\nBody Snippet: {body_snippet}"
-        return banner
-
-    except requests.exceptions.RequestException as e:
-        return f"HTTP request failed: {e}"
+PROBEDISPATCH = {
+    22: sshProbe,
+    53: dnsProbe,
+    389: ldapProbe,
+    445: smbProbe,
+    80: httpProbe,
+    443: httpProbe,
+    8080: httpProbe,
+    8000: httpProbe,
+}
 
 def grabBanner(target, port, verbose=False):
     # Handle HTTP(S) first
-    if port in [80, 443, 8080, 8000]:
-        return httpProbe(target, port, verbose)
+    if port in PROBEDISPATCH:
+        return PROBEDISPATCH[port](target, port)
 
     banner = ""
 
@@ -95,6 +105,7 @@ def grabBanner(target, port, verbose=False):
             # === Protocol-Specific Probing ===
             if port == 21:  # FTP
                 s.sendall(b"USER anonymous\r\n")
+
 
             elif port == 25:  # SMTP
                 s.sendall(b"EHLO vulnscanner.local\r\n")
@@ -119,6 +130,7 @@ def grabBanner(target, port, verbose=False):
             s.sendall(b"\r\n")
 
             banner = s.recv(1024).decode(errors="ignore").strip()
+            
             if verbose:
                 print(f"[*] Raw banner from port {port}: {banner}")
 

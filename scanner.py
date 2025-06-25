@@ -1,5 +1,5 @@
 import socket
-from bannerGrab import grabBanner
+from probe import grabBanner
 from vulnDB import vulnLookup
 from cveAPI import searchCVE
 import ipaddress
@@ -68,55 +68,83 @@ def scanTarget(target, verbose=False, port_list=None):
    
     for port in port_list:
         if verbose:
-            print(f"[*] Checking port {port}...")
+            print(f"[*] Scanning {target} on port {port}...")
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(1)
+                s.settimeout(0.3)
                 result = s.connect_ex((target, port))
 
                 if result == 0:
-                    banner = grabBanner(target, port)
+                    banner = grabBanner(target, port, verbose)
                     service, version = parseBanner(banner)
+
                     if verbose:
                         print(f"[+] Port {port} open")
                         print(f"    └─ Banner: {banner.strip()}")
                         if service and version:
                             print(f"    └─ Detected: {service} {version}")
 
-                    query = f"{service} {version}" if service and version else banner.strip()
-                    cveResults = searchCVE(query)
+                    queries = []
+                    if service and version:
+                        queries = [
+                            f"{service} {version}"
+                            f"{service}/{version}"
+                            f"{service}-{version}"
+                            f"{service} version {version}"
+                        ]
+                    else:
+                        queries = [banner.strip()]
+
+                    apiResults = []
+                    for q in queries:
+                        apiResults.extend(searchCVE(q))
+                    
+                    seenIDs = set()
+                    uniqueAPIresults = []
+                    for cve in apiResults:
+                        cid = cve.get("id")
+                        if cid and cid not in seenIDs:
+                            seenIDs.add(cid)
+                            uniqueAPIresults.append(cve)
 
                     matched_cves = []
                     for word in banner.lower().split():
                         if word in vulnLookup:
                             matched_cves.extend(vulnLookup[word][:2])  # Top 2 results
 
-                    if not matched_cves and not cveResults:
-                        if verbose:
-                            print(f"[#] Port {port} - No known vulnerabilities found.")
+                    allVulns = uniqueAPIresults + [{"id": cve, "summary": "From local DB"} for cve in matched_cves]
 
-                    hasVulns = bool(cveResults or matched_cves)
+                    finalVulns = []
+                    seenFinal = set()
+                    for v in allVulns:
+                        cid = v.get("id")
+                        if cid and cid not in seenFinal:
+                            seenFinal.add(cid)
+                            finalVulns.append({
+                                "id": cid,
+                                "summary": v.get("summary", "No summary available")
+                            })
+                    if not finalVulns and verbose:
+                        print(f"[#] Port {port} - No known vulnerabilities found.")
 
                     report["openPorts"][port] = {
                         "banner": banner.strip(),
-                        "vulnerable": hasVulns,
+                        "vulnerable": bool(finalVulns),
                         "notes": "None",
-                        "vulnerabilities_found": (
-                            [{"id": cve.get("id"), "summary": cve.get("summary")} for cve in cveResults]
-                            if hasVulns else
-                            "No known vulnerabilities found."
-                    )
-                }
+                        "vulnerabilities_found": finalVulns if finalVulns else "No known vulnerabilities found."
+                    }
+
         except Exception as e:
             if verbose:
                 print(f"[!] Error on port {port}: {e}")
             continue 
+
     return report
 
 
 def scanTargets(target_list, verbose=False, port_list=None):
     results = []
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=50) as executor:
         futures = {
             executor.submit(scanTarget, target, verbose, port_list): target 
             for target in target_list
