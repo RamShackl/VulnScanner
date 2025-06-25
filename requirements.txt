@@ -1,1 +1,5 @@
-requests
+requests>=2.20.0
+networkx
+matplotlib
+pyvis>=0.2.1
+jinja2>=3.0

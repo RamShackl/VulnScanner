@@ -26,7 +26,7 @@ class VulnScannerGUI:
         self.target_entry = ttk.Entry(root, width=50)
         self.target_entry.pack()
 
-        self.verbose_var = tk.BooleanVar()
+        self.verbose_var = tk.BooleanVar(value=True)
         self.verbose_check = ttk.Checkbutton(root, text="Verbose Output", variable=self.verbose_var)
         self.verbose_check.pack()
 

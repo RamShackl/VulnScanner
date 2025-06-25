@@ -71,7 +71,7 @@ def scanTarget(target, verbose=False, port_list=None):
             print(f"[*] Scanning {target} on port {port}...")
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(0.3)
+                s.settimeout(0.5)
                 result = s.connect_ex((target, port))
 
                 if result == 0:

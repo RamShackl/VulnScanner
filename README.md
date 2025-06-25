@@ -15,8 +15,8 @@ A lightweight, modular Python-based vulnerability scanner designed for education
 
 ## Dependencies
 - "Python 3.9+"
-- "requests (This is installed during setup automatically)
-- "tkinter - not included in all Linux installs, i.e. Arch. If missing, install via package manager.
+- "requests 2.20.0"
+- "tkinter" - Not default on Arch or lightweight Debian distros.
 ```bash
 sudo pacman -S tk 
 
@@ -24,6 +24,11 @@ or
 
 sudo apt install python3-tk
 ```
+- "pyvis 0.2.1" - Specific version needed. Dunno why.
+- jinja2 =0.3"
+
+Dependencies are automatically installed with setup.py
+
 ## Getting Started
 
 First, run the setup.py to download any dependencies.
