@@ -26,7 +26,11 @@ sudo apt install python3-tk
 ```
 ## Getting Started
 
-Instructions for terminal setup for headless setups.
+First, run the setup.py to download any dependencies.
+
+Next, to run the program, python3 gui.py
+
+## Instructions for terminal setup for headless setups.
 
 ```bash
 git clone https://github.com/RamShackl/VulnScanner.git

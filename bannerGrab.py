@@ -23,14 +23,51 @@ def grabBanner(ip, port, timeout=2):
                 
                 # Send basic probe depending on port
 
-                if port == 25: # SMTP
+                # === FTP Probe ===
+                if port == 21: 
+                    s.sendall(b"USER anonymous\r\n")
+                    try:
+                        banner += "\n" + s.recv(1024).decode(errors="ignore").strip()
+                    except:
+                        pass
+                
+                # === MySQL Probe ===
+                elif port == 3306:
+                    try:
+                        banner += "\n" + s.recv(1024).decode(errors="ignore").strip()
+                    except:
+                        pass  # MY SQL often sends version string upon connect.
+
+                # === PostgreSQL Probe ===
+                elif port == 5432:
+                    # Send SSLRequest packet: 8 bytes: [int length=8] + [int 80877103]
+                    try:
+                        ssl_request = b'\x00\x00\x00\x08\x04\xd2\x16\x2f'
+                        s.sendall(ssl_request)
+                        resp = s.recv(1024)
+                        if resp == b'S':
+                            banner += "\nPostgreSQL supports SSL."
+                        elif resp == b'N':
+                            banner += "\nPostgreSQL does NOT support SSL."
+                    except:
+                        pass
+
+                # === SMTP Probe ===
+                elif port == 25: # SMTP
                     s.sendall(b"EHLO vulnscanner.local\r\n")
+
+                # === POP3 Probe ===
                 elif port == 110: # POP3
                     s.sendall(b"USER test\r\n")
+
+                # === IMAP Probe ===
                 elif port == 143: # IMAP
                     s.sendall(b"a login test test\r\n")
+
+                # === Telnet Probe ===
                 elif port == 23: # Telnet
                     s.sendall(b"\n")
+                
 
                 try:
                     banner = s.recv(1024).decode(errors="ignore").strip()

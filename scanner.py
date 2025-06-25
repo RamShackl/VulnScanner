@@ -3,6 +3,7 @@ from bannerGrab import grabBanner
 from vulnDB import vulnLookup
 from cveAPI import searchCVE
 import ipaddress
+from serviceParser import parseBanner
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 COMMONPORTS = [
@@ -64,12 +65,8 @@ def scanTarget(target, verbose=False, port_list=None):
         port_list = COMMONPORTS
 
     report = {"target": target, "openPorts":{}}
-
+   
     for port in port_list:
-        if verbose:
-            print(f"[*] Scanning port {port}...")
-    
-    for port in COMMONPORTS:
         if verbose:
             print(f"[*] Checking port {port}...")
         try:
@@ -79,33 +76,35 @@ def scanTarget(target, verbose=False, port_list=None):
 
                 if result == 0:
                     banner = grabBanner(target, port)
+                    service, version = parseBanner(banner)
                     if verbose:
-                        print(f"[+] Port {port} open: Banner: {banner.strip()}")
-                    vulnInfo = None
+                        print(f"[+] Port {port} open")
+                        print(f"    └─ Banner: {banner.strip()}")
+                        if service and version:
+                            print(f"    └─ Detected: {service} {version}")
+
+                    query = f"{service} {version}" if service and version else banner.strip()
+                    cveResults = searchCVE(query)
+
                     matched_cves = []
                     for word in banner.lower().split():
                         if word in vulnLookup:
                             matched_cves.extend(vulnLookup[word][:2])  # Top 2 results
 
-
-                    cveResults = searchCVE(banner.strip())
-
                     if not matched_cves and not cveResults:
                         if verbose:
                             print(f"[#] Port {port} - No known vulnerabilities found.")
 
-                    hasVulns = bool(vulnInfo) or bool(cveResults) or bool(matched_cves)
+                    hasVulns = bool(cveResults or matched_cves)
 
                     report["openPorts"][port] = {
                         "banner": banner.strip(),
-                        "vulnerable": bool(cveResults or matched_cves),
-                        "notes": vulnInfo or "None",
+                        "vulnerable": hasVulns,
+                        "notes": "None",
                         "vulnerabilities_found": (
-                            [
-                            {"id": cve.get("id"), "summary": cve.get("summary")}
-                            for cve in cveResults
-                        ] if hasVulns else
-                        "No known vulnerabilities found."
+                            [{"id": cve.get("id"), "summary": cve.get("summary")} for cve in cveResults]
+                            if hasVulns else
+                            "No known vulnerabilities found."
                     )
                 }
         except Exception as e:

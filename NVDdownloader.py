@@ -6,13 +6,13 @@ import shutil
 # Configurable year and URLs
 YEAR = "2024"
 FEED_URL = f"https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-{YEAR}.json.gz"
-OUTPUT_GZ = f"nvdcve-1.1-{YEAR}.json,gz"
+OUTPUT_GZ = f"nvdcve-1.1-{YEAR}.json.gz"
 OUTPUT_JSON = f"nvdcve-1.1-{YEAR}.json"
 
 def downloadNVDfeed():
     if os.path.exists(OUTPUT_JSON):
         print(f"[+] JSON file already exists: {OUTPUT_JSON}")
-        return
+        return OUTPUT_JSON
 
     print(f"[+] Downloading {OUTPUT_GZ}...")
     response = requests.get(FEED_URL, stream=True)
@@ -29,6 +29,11 @@ def downloadNVDfeed():
         print(f"[+] Extraction complete: {OUTPUT_JSON}")
         os.remove(OUTPUT_GZ)
         print(f"[+] Cleaned up compressed file.")
+        return OUTPUT_JSON
     else:
         print(f"[!] Failed to download feed. Status code: {response.status_code}")
+        return None
 
+if __name__ == "__main__":
+    result = downloadNVDfeed()
+    print("[DEBUG] Result:", result)
