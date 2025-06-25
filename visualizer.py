@@ -1,64 +1,68 @@
 import json
-import networkx as nx
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
+from pyvis.network import Network
 
-def loadReport(reportPath="report.json"):
-    with open(reportPath, "r") as f:
+
+def load_report(report_path="report.json"):
+    with open(report_path, "r") as f:
         return json.load(f)
     
-def visualizeNetwork(report):
-    G = nx.Graph()
+def sanitize(text):
+    return text.replace("<", "").replace(">", "").replace("\"", "'").strip()
+
+def visualize_network_interactive(report):
+    net = Network(height="750px", width="100%", bgcolor="#222222", font_color="white")
+    net.barnes_hut()
+
+    MAX_SUMMARY_LEN = 16
 
     for entry in report:
         target = entry.get("target")
-        G.add_node(target, type="host", color="skyblue")
-
         ports = entry.get("openPorts", {})
+
+        if not ports:
+            continue
+
+        net.add_node(target, label=target, title=f"Host: {target}", color="skyblue", shape="dot", size=25)
+
+        
         for port, info in ports.items():
-            portNode = f"{target}:{port}"
-            service = info.get("banner", "").split("\n")[0]
+            port_node_id = f"{target}:{port}"
             vulns = info.get("vulnerabilities_found", [])
-            vulnFlag = bool(vulns and isinstance(vulns, list) and vulns[0] != "No known vulnerabilities found.")
+            vuln_flag = isinstance(vulns, list) and vulns and vulns[0] != "No known vulnerabilities found."
 
-            # Port node
-            G.add_node(portNode, type="port", color="red" if vulnFlag else "green")
-            G.add_edge(target, portNode)
+            color = "red" if vuln_flag else "green"
+            banner = info.get("banner", "No banner info")
 
-    hosts = [n for n, attr in G.nodes(data=True) if attr['type'] == 'host']
-    ports = [n for n, attr in G.nodes(data=True) if attr['type'] == 'port']
+            
+            short_banner = banner[:100] + "..." if len(banner) > 100 else banner
+            safe_banner = sanitize(short_banner)
 
-    
-    pos = nx.spring_layout(G, seed=42) # positioning layout
+            
+            if vuln_flag:
+                vulns_text = "Vulnerabilities:" + " | ".join(
+                    [
+                        f"{cve.get('id')}: {sanitize(cve.get('summary')[:MAX_SUMMARY_LEN])}..."
+                        for cve in vulns
+                    ]
+                )
+            else:
+                vulns_text = "No known vulnerabilities found."
 
-    plt.figure(figsize=(14, 10))
+            tooltip = f"Port {port} | {safe_banner} | {vulns_text}"
 
-    # Draw ports
-    nx.draw_networkx_nodes(G, pos,
-                           nodelist=ports,
-                           node_shape='s',
-                           node_color=[G.nodes[n]['color'] for n in ports],
-                           node_size=600,
-                           label='Port')
+            net.add_node(
+                port_node_id,
+                label=str(port),
+                title=tooltip,
+                color=color,
+                shape="square",
+                size=15
+            )
+            net.add_edge(target, port_node_id)
 
-    # Draw edges
-    nx.draw_networkx_edges(G, pos, alpha=0.4)
-
-    # Label only hosts for clarity
-    labels = {n: n for n in hosts}
-    nx.draw_networkx_labels(G, pos, labels, font_size=10, font_weight='bold')
-
-    # Legend
-    red_patch = mpatches.Patch(color='red', label='Vulnerable Port')
-    green_patch = mpatches.Patch(color='green', label='Non-vulnerable Port')
-    blue_patch = mpatches.Patch(color='skyblue', label='Host (IP)')
-    plt.legend(handles=[blue_patch, green_patch, red_patch])
-
-    plt.title("Network Map - Hosts and Open Ports")
-    plt.axis('off')
-    plt.tight_layout()
-    plt.show()
+    net.show_buttons(filter_=['physics'])
+    net.show("network_map.html")
 
 if __name__ == "__main__":
-    report_data = loadReport()
-    visualizeNetwork(report_data)
+    report_data = load_report()
+    visualize_network_interactive(report_data)
