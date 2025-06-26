@@ -8,7 +8,7 @@ import json
 import signal
 import sys
 from visualizer import visualize_network_interactive
-
+from reportWriter import saveReport
 from scanner import generateTargets, scanTargets, COMMONPORTS
 
 def signal_handler(sig, frame):
@@ -55,12 +55,22 @@ class VulnScannerGUI:
         self.full_scan_check = ttk.Checkbutton(root, text="Scan all well-known ports", variable=self.full_scan_var)
         self.full_scan_check.pack()
 
+        self.show_debug = tk.BooleanVar(value=True)
+        toggle_button = tk.Checkbutton(root, text="Show Debug Output", variable=self.show_debug, command=self.toggle_debug)
+        toggle_button.pack()
+
         self.output_box = ScrolledText(root, height=25, bg="black", fg="lime", font=("Courier", 10))
         self.output_box.pack(fill=tk.BOTH, expand=True)
 
         self.log("[~] Initializing Vulnerability Scanner...")
         self.ensure_nvd_data()
         self.log("[#] Setup complete. Ready to scan.")
+
+    def toggle_debug(self):
+        if self.show_debug.g():
+            self.output_box.pack(fill=tk.BOTH, expand=True)
+        else:
+            self.output_box.pack_forget()
 
     def print_to_log(self, *args, **kwargs):
         message = " ".join(str(arg) for arg in args)
@@ -110,8 +120,7 @@ class VulnScannerGUI:
         finally:
             __builtins__.print = original_print
 
-        with open("report.json", "w") as f:
-            json.dump(results, f, indent=10)
+        saveReport(results, verbosity="full") # or 'summary' for a brief report
 
         self.log("[#] Scan complete. Report saved to report.json")
         self.start_button.config(state=tk.NORMAL)
@@ -139,29 +148,33 @@ class VulnScannerGUI:
 
         report_text = ScrolledText(report_window, bg="white", fg="black", font=("Courier", 10))
         report_text.pack(fill=tk.BOTH, expand=True)
+        
 
         for result in data:
             target = result.get("target", "Unknown Target")
             report_text.insert(tk.END, f"\n[Target] {target}\n", "header")
+            report_text.insert(tk.END, f"--- OPEN PORTS ---\n", "subheader")
 
             for port, info in result.get("openPorts", {}).items():
                 banner = info.get("banner", "No banner")
                 vuln = info.get("vulnerable", False)
-                report_text.insert(tk.END, f" Port {port}: {banner}\n")
+                report_text.insert(tk.END, f"  Port {port}: {banner}\n")
 
                 if vuln:
-                    report_text.insert(tk.END, "Vulnerabilities:\n", "vuln")
+                    report_text.insert(tk.END, "    Vulnerabilities:\n", "vuln")
                     for cve in info.get("vulnerabilities_found", []):
                         report_text.insert(
                             tk.END,
-                            f" -{cve.get('id')}: {cve.get('summary')}\n",
+                            f"      -{cve.get('id')}: {cve.get('summary')}\n",
                             "vuln"
                         )
                 else:
-                    report_text.insert(tk.END, "No known vulnerabilities detected.\n")
+                    report_text.insert(tk.END, "    No known vulnerabilities detected.\n")
 
-        report_text.tag_config("vuln", foreground="red", font=("Courier", 10, "bold"))
         report_text.tag_config("header", foreground="blue", font=("Courier", 11, "bold"))
+        report_text.tag_config("subheader", foreground="gray", font=("Courier", 10, "bold"))
+        report_text.tag_config("vuln", foreground="red", font=("Courier", 10, "bold"))
+        report_text.tag_config("clean", foreground="green", font=("Courier", 10, "italic"))
 
         report_text.config(state=tk.DISABLED)
 

@@ -23,7 +23,17 @@ def visualize_network_interactive(report):
         if not ports:
             continue
 
-        net.add_node(target, label=target, title=f"Host: {target}", color="skyblue", shape="dot", size=25)
+        host_label = f"{hostname} ({target})" if hostname and hostname != target else target
+        host_title = f"Host: {target}" + (f"\nHostname: {hostname}" if hostname and hostname != target else "")
+
+        net.add_node(
+            target,
+            label=host_label,
+            title=host_title,
+            color="skyblue",
+            shape="dot",
+            size=25
+        )
 
         
         for port, info in ports.items():
@@ -40,7 +50,7 @@ def visualize_network_interactive(report):
 
             
             if vuln_flag:
-                vulns_text = "Vulnerabilities:" + " | ".join(
+                vulns_text = "Vulnerabilities:<br>" + "<br>".join(
                     [
                         f"{cve.get('id')}: {sanitize(cve.get('summary')[:MAX_SUMMARY_LEN])}..."
                         for cve in vulns

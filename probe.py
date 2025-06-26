@@ -83,22 +83,30 @@ def smbProbe(target, port=445, timeout=3):
             s.settimeout(timeout)
             s.connect((target, port))
 
-            # NTLMSSP NEGOTIATE packet (extracts useful system data)
-            negotiate_protocol_request = bytes.fromhex(
+            # SMBv1 Negotiate Protocol Request
+            negotiateProtocol= bytes.fromhex(
                 "00000054"  # Message length
                 "ff534d4272000000001801280000000000000000000000000000000000000000"
                 "00000000ffffffff000000000000000000000000000000000000000000000000"
                 "000000000000000000"
             )
 
-            s.sendall(negotiate_protocol_request)
-            data = s.recv(4096)
-
-            if b"NTLMSSP" in data:
-                return "SMB NTLMSSP negotiation received. Possible null session or guest access."
-            return "SMB response received, but NTLMSSP not found."
+            s.sendall(negotiateProtocol)
+            
+            try:
+                data = s.recv(512)
+                if b"SMB" in data:
+                    return "SMB service detected (port 445)"
+                return f"Unknown SMB response: {data.dex()[:80]}"
+            except socket.timeout:
+                return "SMB response timed out (no reply)"
+    except ConnectionResetError:
+            return "Connection reset by SMB server (likely hardened against probes)"
+    except socket.timeout:
+            return "Connection timed out (no SMB service response)"
     except Exception as e:
-        return f"Enhanced SMB probe failed: {e}"
+            return f"SMB probe failed: {e}"    
+
 
 def sshProbe(target, port):
     try:

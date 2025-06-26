@@ -17,3 +17,8 @@ report.json
 # OS/filesystem
 .DS_Store
 Thumbs.db
+
+*.db
+*.log
+*.bak
+*.pyc
