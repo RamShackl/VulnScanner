@@ -17,6 +17,7 @@ def visualize_network_interactive(report):
 
     for entry in report:
         target = entry.get("target")
+        hostname = entry.get("hostname", "")
         ports = entry.get("openPorts", {})
 
         if not ports:

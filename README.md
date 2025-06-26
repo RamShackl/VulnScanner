@@ -1,4 +1,4 @@
-# Simple Python Vulnerability Scanner
+# Python Vulnerability Scanner
 
 A lightweight, modular Python-based vulnerability scanner designed for educational penetration testing.
 
@@ -6,10 +6,12 @@ A lightweight, modular Python-based vulnerability scanner designed for education
 - Multi-threaded scanning of common ports
 - CIDR range support (e.g. 192.168.1.0/24)
 - Banner grabbing for service identification
+- More in depth probing on specific ports
 - CVE lookup via both:
     - Offline NVD JSON data
     - Online CVE API
 - JSON report generation
+- Network cartography with visual map of network.
 - Simple installer: `python3 setup.py`
 - **NEW** Added GUI with debug window for ease of use
 
@@ -24,7 +26,7 @@ or
 
 sudo apt install python3-tk
 ```
-- "pyvis 0.2.1" - Specific version needed. Dunno why.
+- "pyvis 0.2.1" - Specific version needed.
 - jinja2 =0.3"
 
 Dependencies are automatically installed with setup.py

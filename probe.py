@@ -3,43 +3,84 @@ import ssl
 import http.client
 import requests
 
+
 def httpProbe(target, port, verbose=False):
-    try:
-        url = f"http://{target}:{port}/"
-        if port == 443:
-            url = f"https://{target}/"
+    from urllib.parse import urljoin
 
-        if verbose:
-            print(f"[*] Probing HTTP(s) URL: {url}")
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "curl/7.79.1",
+        "python-requests/2.31.0"
+    ]
 
-        response = requests.get(url, timeout=3)
-        server = response.headers.get("Server", "Unknown Server")
-        status_line = f"HTTP/{response.raw.version/10:.1f} {response.status_code} {response.reason}"
-        body_snippet = response.text[:200].replace('\n', ' ').replace('\r', '')
+    protocols = ["http", "https"] if port in [80, 443, 8080, 8000] else ["http"]
+    max_body = 300
+    timeout = 3
+    max_redirects = 3
 
-        banner = f"{status_line}\nServer: {server}\nBody Snippet: {body_snippet}"
-        return banner
+    for proto in protocols:
+        url = f"{proto}://{target}:{port}/"
+        for agent in user_agents:
+            headers = {"User-Agent": agent}
+            try:
+                if verbose:
+                    print(f"[~] Trying {proto.upper()} {url} with UA '{agent}'")
 
-    except requests.exceptions.RequestException as e:
-        return f"HTTP request failed: {e}"
+                session = requests.Session()
+                response = session.get(url, headers=headers, timeout=timeout, allow_redirects=False)
+
+                # Follow up to 3 redirects manually
+                redirects = 0
+                while response.status_code in [301, 302, 303, 307, 308] and redirects < max_redirects:
+                    next_url = response.headers.get("Location")
+                    if not next_url:
+                        break
+                    url = urljoin(url, next_url)
+                    response = session.get(url, headers=headers, timeout=timeout, allow_redirects=False)
+                    redirects += 1
+
+                server = response.headers.get("Server", "Unknown Server")
+                powered_by = response.headers.get("X-Powered-By", "Unknown")
+                status_line = f"{response.status_code} {response.reason}"
+                body_snippet = response.text[:max_body].replace("\n", " ").replace("\r", "")
+
+                return f"{proto.upper()} {url}\n{status_line}\nServer: {server}\nX-Powered-By: {powered_by}\nBody Snippet: {body_snippet}"
+
+            except requests.exceptions.Timeout:
+                continue  # Try next agent or protocol
+            except requests.exceptions.SSLError as e:
+                if proto == "https" and verbose:
+                    print(f"[!] SSL Error: {e}")
+                continue
+            except requests.exceptions.RequestException as e:
+                if verbose:
+                    print(f"[!] Request failed: {e}")
+                continue
+
+    return "HTTP probe failed or no response"
     
-def smbProbe(target, port):
+def smbProbe(target, port=445, timeout=3):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(3)
+            s.settimeout(timeout)
             s.connect((target, port))
-            # Send basic SMB negotiation request (simplified)
-            smb_request = bytes.fromhex(
-                "00000085ff534d4272000000001801280000000000000000000000000000000000000000ffff0000"
-                "00000000000000000000000000000000000000000000000000000000000000"
+
+            # NTLMSSP NEGOTIATE packet (extracts useful system data)
+            negotiate_protocol_request = bytes.fromhex(
+                "00000054"  # Message length
+                "ff534d4272000000001801280000000000000000000000000000000000000000"
+                "00000000ffffffff000000000000000000000000000000000000000000000000"
+                "000000000000000000"
             )
-            s.sendall(smb_request)
-            data = s.recv(1024)
-            if b"SMB" in data:
-                return "SMB service detected (port 445)"
-            return "Possible SMB response (unparsed)"
+
+            s.sendall(negotiate_protocol_request)
+            data = s.recv(4096)
+
+            if b"NTLMSSP" in data:
+                return "SMB NTLMSSP negotiation received. Possible null session or guest access."
+            return "SMB response received, but NTLMSSP not found."
     except Exception as e:
-        return f"SMB probe failed: {e}"
+        return f"Enhanced SMB probe failed: {e}"
 
 def sshProbe(target, port):
     try:
@@ -51,33 +92,50 @@ def sshProbe(target, port):
     except Exception as e:
         return f"SSH probe failed: {e}"
 
-def ldapProbe(target, port):
+def ldapProbe(target, port=389, timeout=3):
     try:
+        # Basic LDAP anonymous bind request (BER encoded)
         ldap_bind = bytes.fromhex(
             "30 1c 02 01 01 60 17 02 01 03 04 00 80 00 02 01 00 02 01 00 02 01 00"
         )
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(2)
+            s.settimeout(timeout)
             s.connect((target, port))
             s.sendall(ldap_bind)
             data = s.recv(1024)
-            return f"LDAP response: {data.hex()[:100]}"
-    except Exception as e:
-        return f"LDAP probe failed: {e}"
 
-def dnsProbe(target, port=53):
+            if data:
+                return f"LDAP bind response received: {data.hex()[:120]}"
+            return "LDAP response empty."
+    except Exception as e:
+        return f"Enhanced LDAP probe failed: {e}"
+
+
+def dnsProbe(target, port=53, timeout=3):
     try:
-        dns_query = bytes.fromhex(
-            "AA AA 01 00 00 01 00 00 00 00 00 00 07 65 78 61 6D 70 6C 65"
-            "03 63 6F 6D 00 00 01 00 01"
-        )
+        query_id = b"\xaa\xaa"
+        flags = b"\x01\x00"  # Standard query
+        qdcount = b"\x00\x01"
+        ancount = b"\x00\x00"
+        nscount = b"\x00\x00"
+        arcount = b"\x00\x00"
+        domain_parts = b"\x07example\x03com\x00"  # example.com
+        qtype = b"\x00\x01"
+        qclass = b"\x00\x01"
+
+        dns_query = query_id + flags + qdcount + ancount + nscount + arcount + domain_parts + qtype + qclass
+
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.settimeout(2)
+            s.settimeout(timeout)
             s.sendto(dns_query, (target, port))
             data, _ = s.recvfrom(512)
-            return f"DNS response received: {data.hex()[:100]}"
+
+            if data:
+                return f"DNS response (hex): {data.hex()[:120]}"
+            return "No DNS response."
     except Exception as e:
-        return f"DNS probe failed: {e}"
+        return f"Enhanced DNS probe failed: {e}"
+
 
 PROBEDISPATCH = {
     22: sshProbe,
@@ -125,6 +183,7 @@ def grabBanner(target, port, verbose=False):
             elif port == 5432:  # PostgreSQL
                 ssl_request = b'\x00\x00\x00\x08\x04\xd2\x16\x2f'
                 s.sendall(ssl_request)
+            
 
             # Default probe
             s.sendall(b"\r\n")

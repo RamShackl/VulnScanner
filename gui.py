@@ -7,8 +7,9 @@ import subprocess
 import json
 import signal
 import sys
+from visualizer import visualize_network_interactive
 
-from scanner import generateTargets, scanTargets, scanTarget
+from scanner import generateTargets, scanTargets, COMMONPORTS
 
 def signal_handler(sig, frame):
     print("Exiting, closing GUI windows...")
@@ -17,6 +18,16 @@ def signal_handler(sig, frame):
 
 class VulnScannerGUI:
     def __init__(self, root):
+
+        # Progress bar label
+        self.progress_label = ttk.Label(root, text="Scan Progress:")
+        self.progress_label.pack(pady=(10, 0))
+
+        # Progress bar widget
+        self.progress = ttk.Progressbar(root, orient="horizontal", length=600, mode="determinate")
+        self.progress.pack(pady=(0, 10))
+
+
         self.root = root
         self.root.title("Python Vulnerability Scanner")
         self.root.geometry("800x600")
@@ -35,6 +46,10 @@ class VulnScannerGUI:
 
         self.view_button = ttk.Button(root, text="View Report", command=self.view_report)
         self.view_button.pack(pady=5)
+
+        self.visualize_button = tk.Button(root, text="Visualize Network", command=self.visualize_network)
+        self.visualize_button.pack(pady=5)
+
 
         self.full_scan_var = tk.BooleanVar()
         self.full_scan_check = ttk.Checkbutton(root, text="Scan all well-known ports", variable=self.full_scan_var)
@@ -71,24 +86,32 @@ class VulnScannerGUI:
         verbose = self.verbose_var.get()
         port_list = list(range(1, 1025)) if self.full_scan_var.get() else None
 
-
         if not target:
             messagebox.showwarning("Missing Target", "Please enter a valid IP or CIDR.")
             return
 
-        self.log(f"[~] Starting scan for: {target}")
         targets = generateTargets(target)
+        total_tasks = len(targets) * (len(port_list) if port_list else len(COMMONPORTS))
+        self.progress["maximum"] = total_tasks
+        self.progress["value"] = 0
+
+        # Define progress callback that updates the progress bar on the GUI thread
+        def progress_callback():
+            self.root.after(0, lambda: self.progress.step(1))
+
+        self.log(f"[~] Starting scan for: {target}")
 
         original_print = __builtins__.print
         __builtins__.print = self.print_to_log
 
         try:
-            results = scanTargets(targets, verbose=verbose, port_list=port_list)
+            # Pass the progress_callback to scanTargets
+            results = scanTargets(targets, verbose=verbose, port_list=port_list, progress_callback=progress_callback)
         finally:
             __builtins__.print = original_print
 
         with open("report.json", "w") as f:
-            json.dump(results, f, indent=2)
+            json.dump(results, f, indent=10)
 
         self.log("[#] Scan complete. Report saved to report.json")
         self.start_button.config(state=tk.NORMAL)
@@ -141,6 +164,22 @@ class VulnScannerGUI:
         report_text.tag_config("header", foreground="blue", font=("Courier", 11, "bold"))
 
         report_text.config(state=tk.DISABLED)
+
+    def visualize_network(self):
+        if not os.path.exists("report.json"):
+            messagebox.showerror("No Report", "No report.json file found.")
+            return
+
+        try:
+            with open("report.json", "r") as f:
+                data = json.load(f)
+        except Exception as e:
+            messagebox.showerror("Error Reading Report", str(e))
+            return
+
+        self.log("[~] Opening network visualizer...")
+        visualize_network_interactive(data)
+        self.log("[#] Network map written to network_map.html")
 
 if __name__ == "__main__":
     global root
