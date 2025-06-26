@@ -59,7 +59,14 @@ def visualize_network_interactive(report):
             else:
                 vulns_text = "No known vulnerabilities found."
 
-            tooltip = f"Port {port} | {safe_banner} | {vulns_text}"
+            tooltip = f"Target: {target}\nHostname: {hostname or 'N/A'}\nPort: {port}\nBanner: {safe_banner}\nStatus: {'Vulnerable' if vuln_flag else 'Secure'}\n"
+
+            if vuln_flag:
+                for cve in vulns:
+                    summary = sanitize(cve.get("summary", "")[:MAX_SUMMARY_LEN])
+                    tooltip += f"- {cve.get('id')}: {summary}...\n"
+            else:
+                tooltip += "No known vulnerabilities\n"
 
             net.add_node(
                 port_node_id,

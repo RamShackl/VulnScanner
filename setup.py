@@ -40,8 +40,6 @@ def main():
     downloadNVD()
     checkFiles()
     print("\n[$] Setup complete!")
-    print("You can now run the scanner like this:\n")
-    print("python3 main.py <target ip(s)> -o report.json\n")
 
 if __name__ == "__main__":
     main()

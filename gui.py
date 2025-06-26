@@ -56,8 +56,8 @@ class VulnScannerGUI:
         self.full_scan_check.pack()
 
         self.show_debug = tk.BooleanVar(value=True)
-        toggle_button = tk.Checkbutton(root, text="Show Debug Output", variable=self.show_debug, command=self.toggle_debug)
-        toggle_button.pack()
+        self.debug_toggle_button = tk.Checkbutton(root, text= "Hide Debug", variable=self.show_debug, command=self.toggle_debug)
+        self.debug_toggle_button.pack()
 
         self.output_box = ScrolledText(root, height=25, bg="black", fg="lime", font=("Courier", 10))
         self.output_box.pack(fill=tk.BOTH, expand=True)
@@ -67,10 +67,15 @@ class VulnScannerGUI:
         self.log("[#] Setup complete. Ready to scan.")
 
     def toggle_debug(self):
-        if self.show_debug.g():
+        if self.show_debug.get():
             self.output_box.pack(fill=tk.BOTH, expand=True)
+            self.debug_toggle_button.config(text="Hide Debug")
         else:
             self.output_box.pack_forget()
+            self.debug_toggle_button.config(text="Show Debug")
+
+        self.root.update_idletasks()
+        self.root.minsize(self.root.winfo_width(), self.root.winfo_height())
 
     def print_to_log(self, *args, **kwargs):
         message = " ".join(str(arg) for arg in args)
