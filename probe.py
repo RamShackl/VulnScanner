@@ -58,6 +58,24 @@ def httpProbe(target, port, verbose=False):
                 continue
 
     return "HTTP probe failed or no response"
+
+def kerberosProbe(target, port):
+    try:
+        kerberosAsreq = bytes.fromhex(
+            "6a819b308198a003020105a10c1b0a4b5242544553542e434f4da211300fa00302010aa1081b066b"
+            "7262746573a31b3019a003020112a11230101b0e72657175657374406b726274657374a411180f32"
+            "3031393031303130303030305aa511180f32303139303130313030303030305aa603020164a70302"
+            "0105a811180f32303139303130313030303030305a"
+        )
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.settimeout(2)
+            s.sento(kerberosAsreq, (target, port))
+            data, _ = s.recvfrom(1024)
+            if b'\x7a' in data:
+                return "Kerberos service detected (response received)"
+            return f"Received response on port {port}, unknown Kerberos behavior."
+    except Exception as e:
+        return f"Kerberos probe failed: {e}"
     
 def smbProbe(target, port=445, timeout=3):
     try:
@@ -143,6 +161,8 @@ PROBEDISPATCH = {
     389: ldapProbe,
     445: smbProbe,
     80: httpProbe,
+    88: kerberosProbe,
+    464: kerberosProbe,
     443: httpProbe,
     8080: httpProbe,
     8000: httpProbe,

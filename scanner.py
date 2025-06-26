@@ -25,6 +25,9 @@ COMMONPORTS = [
     # Databases
     1433, 1521, 3306, 5432, 6379,
 
+    # Kerberos
+    88, 464,
+
     # Directory services / LDAP
     389, 636,
 
