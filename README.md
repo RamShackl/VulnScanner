@@ -15,9 +15,18 @@ A lightweight, modular Python-based vulnerability scanner designed for education
 - Simple installer: `python3 setup.py`
 - **NEW** Added GUI with debug window for ease of use
 
+## To do/Future plans
+- Add functions for stealth scan for recon
+- Add more invasive probes for enumeration
+- Realize that nmap does everything this does, but better.
+- Ignore some front end stuff until I get features ironed out
+- Create vulnerable services to test reporting.
+- Dynamic database import
+
 ## Dependencies
 - "Python 3.9+"
 - "requests 2.20.0"
+- "Impacket"
 - "tkinter" - Not default on Arch or lightweight Debian distros.
 ```bash
 sudo pacman -S tk 

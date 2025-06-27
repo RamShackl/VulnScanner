@@ -1,0 +1,4 @@
+Kerberoasting will be logged by Windows Event Logs, Domain Controllers, Azure ATP / Defender for Identity
+post-exploit tool to clean up logs.
+
+remove legacy protocols

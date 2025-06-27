@@ -2,175 +2,22 @@ import socket
 import ssl
 import http.client
 import requests
-
-
-def httpProbe(target, port, verbose=False):
-    from urllib.parse import urljoin
-
-    user_agents = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "curl/7.79.1",
-        "python-requests/2.31.0"
-    ]
-
-    protocols = ["http", "https"] if port in [80, 443, 8080, 8000] else ["http"]
-    max_body = 300
-    timeout = 3
-    max_redirects = 3
-
-    for proto in protocols:
-        url = f"{proto}://{target}:{port}/"
-        for agent in user_agents:
-            headers = {"User-Agent": agent}
-            try:
-                if verbose:
-                    print(f"[~] Trying {proto.upper()} {url} with UA '{agent}'")
-
-                session = requests.Session()
-                response = session.get(url, headers=headers, timeout=timeout, allow_redirects=False)
-
-                # Follow up to 3 redirects manually
-                redirects = 0
-                while response.status_code in [301, 302, 303, 307, 308] and redirects < max_redirects:
-                    next_url = response.headers.get("Location")
-                    if not next_url:
-                        break
-                    url = urljoin(url, next_url)
-                    response = session.get(url, headers=headers, timeout=timeout, allow_redirects=False)
-                    redirects += 1
-
-                server = response.headers.get("Server", "Unknown Server")
-                powered_by = response.headers.get("X-Powered-By", "Unknown")
-                status_line = f"{response.status_code} {response.reason}"
-                body_snippet = response.text[:max_body].replace("\n", " ").replace("\r", "")
-
-                return f"{proto.upper()} {url}\n{status_line}\nServer: {server}\nX-Powered-By: {powered_by}\nBody Snippet: {body_snippet}"
-
-            except requests.exceptions.Timeout:
-                continue  # Try next agent or protocol
-            except requests.exceptions.SSLError as e:
-                if proto == "https" and verbose:
-                    print(f"[!] SSL Error: {e}")
-                continue
-            except requests.exceptions.RequestException as e:
-                if verbose:
-                    print(f"[!] Request failed: {e}")
-                continue
-
-    return "HTTP probe failed or no response"
-
-def kerberosProbe(target, port):
-    try:
-        kerberosAsreq = bytes.fromhex(
-            "6a819b308198a003020105a10c1b0a4b5242544553542e434f4da211300fa00302010aa1081b066b"
-            "7262746573a31b3019a003020112a11230101b0e72657175657374406b726274657374a411180f32"
-            "3031393031303130303030305aa511180f32303139303130313030303030305aa603020164a70302"
-            "0105a811180f32303139303130313030303030305a"
-        )
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.settimeout(2)
-            s.sento(kerberosAsreq, (target, port))
-            data, _ = s.recvfrom(1024)
-            if b'\x7a' in data:
-                return "Kerberos service detected (response received)"
-            return f"Received response on port {port}, unknown Kerberos behavior."
-    except Exception as e:
-        return f"Kerberos probe failed: {e}"
-    
-def smbProbe(target, port=445, timeout=3):
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(timeout)
-            s.connect((target, port))
-
-            # SMBv1 Negotiate Protocol Request
-            negotiateProtocol= bytes.fromhex(
-                "00000054"  # Message length
-                "ff534d4272000000001801280000000000000000000000000000000000000000"
-                "00000000ffffffff000000000000000000000000000000000000000000000000"
-                "000000000000000000"
-            )
-
-            s.sendall(negotiateProtocol)
-            
-            try:
-                data = s.recv(512)
-                if b"SMB" in data:
-                    return "SMB service detected (port 445)"
-                return f"Unknown SMB response: {data.dex()[:80]}"
-            except socket.timeout:
-                return "SMB response timed out (no reply)"
-    except ConnectionResetError:
-            return "Connection reset by SMB server (likely hardened against probes)"
-    except socket.timeout:
-            return "Connection timed out (no SMB service response)"
-    except Exception as e:
-            return f"SMB probe failed: {e}"    
-
-
-def sshProbe(target, port):
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(2)
-            s.connect((target, port))
-            banner = s.recv(1024).decode(errors='ignore').strip()
-            return banner or "No SSH banner received"
-    except Exception as e:
-        return f"SSH probe failed: {e}"
-
-def ldapProbe(target, port=389, timeout=3):
-    try:
-        # Basic LDAP anonymous bind request (BER encoded)
-        ldap_bind = bytes.fromhex(
-            "30 1c 02 01 01 60 17 02 01 03 04 00 80 00 02 01 00 02 01 00 02 01 00"
-        )
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(timeout)
-            s.connect((target, port))
-            s.sendall(ldap_bind)
-            data = s.recv(1024)
-
-            if data:
-                return f"LDAP bind response received: {data.hex()[:120]}"
-            return "LDAP response empty."
-    except Exception as e:
-        return f"Enhanced LDAP probe failed: {e}"
-
-
-def dnsProbe(target, port=53, timeout=3):
-    try:
-        query_id = b"\xaa\xaa"
-        flags = b"\x01\x00"  # Standard query
-        qdcount = b"\x00\x01"
-        ancount = b"\x00\x00"
-        nscount = b"\x00\x00"
-        arcount = b"\x00\x00"
-        domain_parts = b"\x07example\x03com\x00"  # example.com
-        qtype = b"\x00\x01"
-        qclass = b"\x00\x01"
-
-        dns_query = query_id + flags + qdcount + ancount + nscount + arcount + domain_parts + qtype + qclass
-
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.settimeout(timeout)
-            s.sendto(dns_query, (target, port))
-            data, _ = s.recvfrom(512)
-
-            if data:
-                return f"DNS response (hex): {data.hex()[:120]}"
-            return "No DNS response."
-    except Exception as e:
-        return f"Enhanced DNS probe failed: {e}"
-
+import struct
+from probes.dns import dnsProbe
+from probes.http import httpProbe
+from probes.kerberos import kerberosStealthProbe
+from probes.ldap import ldapStealthProbe
+from probes.smb import smbStealthProbe
+from probes.ssh import sshProbe
 
 PROBEDISPATCH = {
     22: sshProbe,
     53: dnsProbe,
-    389: ldapProbe,
-    445: smbProbe,
+    389: ldapStealthProbe,
     80: httpProbe,
-    88: kerberosProbe,
-    464: kerberosProbe,
+    445: smbStealthProbe,
+    88: kerberosStealthProbe,
+    464: kerberosStealthProbe,
     443: httpProbe,
     8080: httpProbe,
     8000: httpProbe,
