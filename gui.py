@@ -7,7 +7,7 @@ import subprocess
 import json
 import signal
 import sys
-from VulnScanner.visualizer import visualize_network_interactive
+from visualizer import visualize_network_interactive
 from utils.reportWriter import saveReport
 from scanner import generateTargets, scanTargets, COMMONPORTS
 

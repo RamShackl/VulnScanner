@@ -2,6 +2,7 @@ from impacket.krb5.asn1 import AS_REQ
 from impacket.krb5.types import Principal
 from impacket.krb5 import constants
 from pyasn1.codec.der.encoder import encode
+import socket
 
 def kerberosStealthProbe(target, realm="EXAMPLE.LOCAL", user="krbtgt"):
     try:
