@@ -1,8 +1,5 @@
 import socket
-import ssl
 import http.client
-import requests
-import struct
 from probes.dns import dnsProbe
 from probes.http import httpProbe
 from probes.kerberos import kerberosStealthProbe

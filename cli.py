@@ -1,6 +1,6 @@
 import argparse
 from scanner import scanTarget, scanTargets, generateTargets
-from reportWriter import saveReport
+from VulnScanner.utils.reportWriter import saveReport
 
 
 def main():

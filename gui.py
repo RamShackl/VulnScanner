@@ -7,8 +7,8 @@ import subprocess
 import json
 import signal
 import sys
-from visualizer import visualize_network_interactive
-from reportWriter import saveReport
+from VulnScanner.visualizer import visualize_network_interactive
+from utils.reportWriter import saveReport
 from scanner import generateTargets, scanTargets, COMMONPORTS
 
 def signal_handler(sig, frame):

@@ -1,9 +1,9 @@
 import socket
 from probe import grabBanner
-from vulnDB import vulnLookup
-from cveAPI import searchCVE
+from utils.vulnDB import vulnLookup
+from utils.cveAPI import searchCVE
 import ipaddress
-from serviceParser import parseBanner
+from utils.serviceParser import parseBanner
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # List of common ports which may be exploited and have known vulnerabilities.
